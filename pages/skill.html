@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ライザのアトリエ 情報置き場 スキル</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <!-- PapaParse JS (CSV parsing library) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+</head>
+
+<body>
+
+    <h1>ライザのアトリエ 情報置き場 スキル</h1>
+    このページではスキルの情報を漏れなく記述する。
+
+    <hr>
+
+    <table id="skillTable" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>スキル名</th>
+                <th>キャラクター名</th>
+                <th>種類</th>
+                <th>追加効果</th>
+                <th>習得レベル</th>
+                <th>消費AP</th>
+                <th>効果</th>
+            </tr>
+            <!-- 各列に検索ボックスとドロップダウンを追加 -->
+            <tr>
+                <th><input type="text" placeholder="スキル名 条件"></th>
+                <th>
+                    <select id="charaFilter">
+                        <option value="">すべて</option>
+                        <option value="ライザ">ライザ</option>
+                        <option value="レント">レント</option>
+                        <option value="タオ">タオ</option>
+                    </select>
+                </th>
+                <th>
+                    <select id="typeFilter">
+                        <option value="">すべて</option>
+                        <option value="アクティブ">アクティブ</option>
+                        <option value="パッシブ">パッシブ</option>
+                    </select>
+                </th>
+                <th>
+                    <select id="addEffectFilter">
+                        <option value="">すべて</option>
+                        <option value="HP回復">HP回復</option>
+                        <option value="AP回復">AP回復</option>
+                        <option value="攻撃力低下">攻撃力低下</option>
+                        <option value="ノックバック">ノックバック</option>
+                        <option value="防御力無視">防御力無視</option>
+                        <option value="毒付与">毒付与</option>
+                        <option value="呪い付与">呪い付与</option>
+                    </select>
+                </th>
+                <th><input type="text" placeholder="習得レベル 条件"></th>
+                <th><input type="text" placeholder="消費AP 条件"></th>
+                <th><input type="text" placeholder="効果 条件"></th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script>
+        // CSVファイルをAjaxで読み込んでパース
+        function fetchAndDisplayCSV() {
+            Papa.parse('charactorParameter.csv', {
+                download: true,
+                header: true,
+                skipEmptyLines: true, // 空行をスキップして末尾の改行に対応
+                complete: function (results) {
+                    var data = results.data;
+
+                    var table = $('#skillTable').DataTable(); // DataTableの初期化
+
+                    // CSVデータをテーブルに追加
+                    data.forEach(function (row) {
+                        if (Object.keys(row).length > 0) {
+                            table.row.add([
+                                row['スキル名'],
+                                row['キャラクター名'],
+                                row['種類'],
+                                row['追加効果'],
+                                row['習得レベル'],
+                                row['消費AP'],
+                                row['効果']
+                            ]).draw(false);
+                        }
+                    });
+                    table.draw();
+                },
+                error: function (error) {
+                    console.error('CSV読み込み中にエラーが発生しました:', error);
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            $.fn.dataTable.ext.search.push(
+                function (settings, data, dataIndex) {
+                    var allColumnsValid = true;
+
+                    // 1. ドロップダウン検索の処理
+                    function checkDropdown(columnIndex, filterId, contains) {
+                        var filterValue = $(filterId).val();
+                        var columnValue = data[columnIndex] || "";
+                        if (filterValue && filterValue !== "" && (contains ? columnValue.indexOf(filterValue) === -1 : filterValue !== columnValue)) {
+                            return false; // 一致しない場合は無効
+                        }
+                        return true;
+                    }
+
+                    allColumnsValid = allColumnsValid && checkDropdown(1, '#charaFilter', false);
+                    allColumnsValid = allColumnsValid && checkDropdown(2, '#typeFilter', false);
+                    allColumnsValid = allColumnsValid && checkDropdown(3, '#addEffectFilter', true); // 部分一致でフィルタリング
+
+                    return allColumnsValid;
+                }
+            );
+
+            // DataTablesの初期化と列ごとの検索機能を追加
+            var table = $('#skillTable').DataTable({
+                initComplete: function () {
+                    this.api().columns().every(function () {
+                        var that = this;
+
+                        // 各列にある検索ボックスのイベントを設定
+                        $('input', this.header()).on('keyup change', function () {
+                            if (that.search() !== this.value) {
+                                that.search(this.value).draw();
+                            }
+                        });
+                    });
+                }
+            });
+
+            // 各ドロップダウンのイベント
+            $('#charaFilter, #typeFilter, #addEffectFilter').on('change', function () {
+                table.draw(); // ドロップダウンの選択変更時にテーブルを再描画
+            });
+
+            // CSVデータの読み込みと表示を行う
+            fetchAndDisplayCSV();
+        });
+    </script>
+
+    <div id="footer"></div>
+    <script>
+        fetch('../include/footer.html')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(data => {
+                document.getElementById('footer').innerHTML = data;
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+    </script>
+
+</body>
+
+</html>
