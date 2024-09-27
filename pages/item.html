@@ -28,15 +28,23 @@
                 <th>アイテム名</th>
                 <th>Lv</th>
                 <th>スロット</th>
+                <th>適正道具</th>
                 <th>装備可能者</th>
                 <th>カテゴリ</th>
                 <th>属性</th>
+                <th>採取できる場所</th>
             </tr>
             <!-- 各列に検索ボックスとドロップダウンを追加 -->
             <tr>
                 <th><input type="text" placeholder="アイテム名検索"></th>
                 <th><input type="text" placeholder="Lv検索" style="width:100px"></th>
                 <th><input type="text" placeholder="スロット検索" style="width:100px"></th>
+                <th>
+                    <select id="itemFilter">
+                        <option value="">すべて</option>
+                        <option value="杖">杖</option>
+                    </select>
+                </th>
                 <th>
                     <select id="charaFilter">
                         <option value="">すべて</option>
@@ -57,6 +65,14 @@
                         <option value="火属性">火属性</option>
                         <option value="氷属性">氷属性</option>
                         <option value="雷属性">雷属性</option>
+                    </select>
+                </th>
+                <th>
+                    <select id="spotFilter">
+                        <option value="">すべて</option>
+                        <option value="クーケン島">クーケン島</option>
+                        <option value="小妖精の森">小妖精の森</option>
+                        <option value="旅人の道">旅人の道</option>
                     </select>
                 </th>
             </tr>
@@ -84,9 +100,11 @@
                                 row['アイテム名'],
                                 row['Lv'],
                                 row['スロット'],
+                                row['適正道具'],
                                 row['装備可能者'],
                                 row['カテゴリ'],
-                                row['属性']
+                                row['属性'],
+                                row['採取できる場所']
                             ]).draw(false);
                         }
                     });
@@ -104,7 +122,7 @@
                     var allColumnsValid = true;
 
                     // 1. ドロップダウン検索の処理
-                    function checkDropdown(columnIndex, filterId, allowAllMatch) {
+                    function checkDropdown(columnIndex, filterId, allowAllMatch, partialMatch) {
                         var filterValue = $(filterId).val();
                         var columnValue = data[columnIndex] || "";
 
@@ -113,16 +131,25 @@
                             return true;
                         }
 
+                        // 部分一致を許可する場合
+                        if (partialMatch && filterValue && filterValue !== "") {
+                            return columnValue.includes(filterValue); // 部分一致チェック
+                        }
+
+                        // 完全一致チェック
                         if (filterValue && filterValue !== "" && filterValue !== columnValue) {
                             return false; // 一致しない場合は無効
                         }
+
                         return true;
                     }
 
                     // 「装備可能者」列にのみ「全員」に関する処理を適用
-                    allColumnsValid = allColumnsValid && checkDropdown(3, '#charaFilter', true); // 「装備可能者」列のフィルタ
-                    allColumnsValid = allColumnsValid && checkDropdown(4, '#categoryFilter', false); // カテゴリフィルタ
-                    allColumnsValid = allColumnsValid && checkDropdown(5, '#elementFilter', false); // 属性フィルタ
+                    allColumnsValid = allColumnsValid && checkDropdown(3, '#itemFilter', false, true); // 「装備可能者」列のフィルタ
+                    allColumnsValid = allColumnsValid && checkDropdown(4, '#charaFilter', true, false); // 「装備可能者」列のフィルタ
+                    allColumnsValid = allColumnsValid && checkDropdown(5, '#categoryFilter', false, false); // カテゴリフィルタ
+                    allColumnsValid = allColumnsValid && checkDropdown(6, '#elementFilter', false, false); // 属性フィルタ
+                    allColumnsValid = allColumnsValid && checkDropdown(7, '#spotFilter', false, true);
 
 
                     return allColumnsValid;
