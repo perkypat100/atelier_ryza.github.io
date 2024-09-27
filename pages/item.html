@@ -104,18 +104,26 @@
                     var allColumnsValid = true;
 
                     // 1. ドロップダウン検索の処理
-                    function checkDropdown(columnIndex, filterId) {
+                    function checkDropdown(columnIndex, filterId, allowAllMatch) {
                         var filterValue = $(filterId).val();
                         var columnValue = data[columnIndex] || "";
+
+                        // 「装備可能者」列で"全員"が選択されている場合はどのフィルタにもマッチさせる
+                        if (allowAllMatch && columnValue === "全員") {
+                            return true;
+                        }
+
                         if (filterValue && filterValue !== "" && filterValue !== columnValue) {
                             return false; // 一致しない場合は無効
                         }
                         return true;
                     }
 
-                    allColumnsValid = allColumnsValid && checkDropdown(3, '#charaFilter');
-                    allColumnsValid = allColumnsValid && checkDropdown(4, '#categoryFilter');
-                    allColumnsValid = allColumnsValid && checkDropdown(5, '#elementFilter');
+                    // 「装備可能者」列にのみ「全員」に関する処理を適用
+                    allColumnsValid = allColumnsValid && checkDropdown(3, '#charaFilter', true); // 「装備可能者」列のフィルタ
+                    allColumnsValid = allColumnsValid && checkDropdown(4, '#categoryFilter', false); // カテゴリフィルタ
+                    allColumnsValid = allColumnsValid && checkDropdown(5, '#elementFilter', false); // 属性フィルタ
+
 
                     return allColumnsValid;
                 }
