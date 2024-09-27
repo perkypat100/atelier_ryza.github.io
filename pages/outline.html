@@ -76,7 +76,7 @@
                     var allColumnsValid = true;
 
                     // 1. ドロップダウン検索の処理
-                    function checkDropdown(columnIndex, filterId, allowAllMatch) {
+                    function checkDropdown(columnIndex, filterId, allowAllMatch, partialMatch) {
                         var filterValue = $(filterId).val();
                         var columnValue = data[columnIndex] || "";
 
@@ -85,9 +85,16 @@
                             return true;
                         }
 
+                        // 部分一致を許可する場合
+                        if (partialMatch && filterValue && filterValue !== "") {
+                            return columnValue.includes(filterValue); // 部分一致チェック
+                        }
+
+                        // 完全一致チェック
                         if (filterValue && filterValue !== "" && filterValue !== columnValue) {
                             return false; // 一致しない場合は無効
                         }
+
                         return true;
                     }
 

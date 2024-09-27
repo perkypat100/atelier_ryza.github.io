@@ -48,6 +48,8 @@
                     <select id="categoryFilter">
                         <option value="">すべて</option>
                         <option value="ぷに">ぷに</option>
+                        <option value="イタチ">イタチ</option>
+                        <option value="スピリット">スピリット</option>
                         <option value="小型">小型</option>
                     </select>
                 </th>
@@ -112,17 +114,30 @@
                     var allColumnsValid = true;
 
                     // 1. ドロップダウン検索の処理
-                    function checkDropdown(columnIndex, filterId, contains) {
+                    function checkDropdown(columnIndex, filterId, allowAllMatch, partialMatch) {
                         var filterValue = $(filterId).val();
                         var columnValue = data[columnIndex] || "";
-                        if (filterValue && filterValue !== "" && (contains ? columnValue.indexOf(filterValue) === -1 : filterValue !== columnValue)) {
+
+                        // 「装備可能者」列で"全員"が選択されている場合はどのフィルタにもマッチさせる
+                        if (allowAllMatch && columnValue === "全員") {
+                            return true;
+                        }
+
+                        // 部分一致を許可する場合
+                        if (partialMatch && filterValue && filterValue !== "") {
+                            return columnValue.includes(filterValue); // 部分一致チェック
+                        }
+
+                        // 完全一致チェック
+                        if (filterValue && filterValue !== "" && filterValue !== columnValue) {
                             return false; // 一致しない場合は無効
                         }
+
                         return true;
                     }
 
-                    allColumnsValid = allColumnsValid && checkDropdown(5, '#categoryFilter', true);
-                    allColumnsValid = allColumnsValid && checkDropdown(8, '#charaFilter', true);
+                    allColumnsValid = allColumnsValid && checkDropdown(5, '#categoryFilter', false, true);
+                    allColumnsValid = allColumnsValid && checkDropdown(8, '#charaFilter', false, true);
 
                     return allColumnsValid;
                 }
