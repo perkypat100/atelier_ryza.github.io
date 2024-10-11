@@ -1,0 +1,7 @@
+レシピ名,id,ラベル,色,優先度,材料,属性値
+1,a,Node A,黄,1,Iron,7.8
+1,b,Node B,赤,2,Aluminum,2.7
+1,c,Node C,青,3,Copper,8.9
+2,d,Node D,緑,1,Steel,7.5
+2,e,Node E,赤,2,Gold,19.3
+2,f,Node F,青,3,Silver,10.5

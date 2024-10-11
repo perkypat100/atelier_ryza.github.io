@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レシピ一覧</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script> <!-- PapaParseのCDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.21.0/cytoscape.min.js"></script>
+    <!-- CytoscapeのCDN -->
+    <style>
+        #cy {
+            width: 100%;
+            height: 500px;
+            display: block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>レシピ一覧表</h2>
+    <table id="recipeTable" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>レシピ名</th>
+                <th>種類</th>
+                <th>対応グラフ</th>
+            </tr>
+            <tr>
+                <th><input type="text" placeholder="Search レシピ名" /></th>
+                <th>
+                    <select id="typeFilter">
+                        <option value="">すべて</option>
+                        <option value="使用">使用</option>
+                        <option value="装備">装備</option>
+                    </select>
+                </th>
+                <th></th> <!-- 対応グラフ列には検索窓は不要 -->
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <!-- グラフを表示する領域 -->
+    <div id="cy"></div>
+
+    <script>
+        $(document).ready(function () {
+            // CSVファイルを読み込み
+            Papa.parse('compounding_recipe.csv', {
+                download: true,
+                header: true,
+                complete: function (results) {
+                    var data = results.data;
+
+                    // テーブルにデータを追加
+                    data.forEach(function (row, index) {
+                        $('#recipeTable tbody').append(
+                            '<tr>' +
+                            '<td>' + row['レシピ名'] + '</td>' +
+                            '<td>' + row['種類'] + '</td>' +
+                            '<td><a href="#" class="view-graph" data-graph-id="' + index + '">グラフを見る</a></td>' +
+                            '</tr>'
+                        );
+                    });
+
+                    // DataTablesの初期化
+                    var table = $('#recipeTable').DataTable();
+
+                    // レシピ名列の検索機能
+                    table.columns(0).every(function () {
+                        var that = this;
+                        $('input', this.header()).on('keyup change', function () {
+                            if (that.search() !== this.value) {
+                                that.search(this.value).draw();
+                            }
+                        });
+                    });
+
+                    // 種類列のドロップダウンフィルタリング
+                    $('#typeFilter').on('change', function () {
+                        var selectedValue = $(this).val();
+                        table.column(1).search(selectedValue).draw();
+                    });
+
+                    // グラフ表示の設定
+                    $('.view-graph').on('click', function (e) {
+                        e.preventDefault();
+                        var graphId = $(this).data('graph-id');
+
+                        // CSVファイルを読み込み、グラフを描画
+                        loadGraphFromCSV(graphId);
+                    });
+                }
+            });
+        });
+
+        // CSVからデータを読み込み、Cytoscapeでグラフを描画する関数
+        function loadGraphFromCSV(graphId) {
+            var nodesData = [];
+            var edgesData = [];
+
+            // ノードデータの読み込み
+            Papa.parse('compounding_nodes.csv', {
+                download: true,
+                header: true,
+                complete: function (nodeResults) {
+                    nodesData = nodeResults.data.filter(function (row) {
+                        return row['レシピ名'] == graphId; // graphIdに基づいてフィルタリング
+                    }).map(function (row) {
+                        return {
+                            data: {
+                                id: row.id,
+                                label: row['ラベル'],
+                                color: row['色']
+                            }
+                        };
+                    });
+
+                    // エッジデータの読み込み
+                    Papa.parse('compounding_edges.csv', {
+                        download: true,
+                        header: true,
+                        complete: function (edgeResults) {
+                            edgesData = edgeResults.data.filter(function (row) {
+                                return row['レシピ名'] == graphId; // graphIdに基づいてフィルタリング
+                            }).map(function (row) {
+                                return {
+                                    data: {
+                                        source: row.source,
+                                        target: row.target
+                                    }
+                                };
+                            });
+
+                            // グラフを描画
+                            drawGraph(nodesData, edgesData);
+                        }
+                    });
+                }
+            });
+        }
+
+        // Cytoscapeでグラフを描画する関数
+        function drawGraph(nodesData, edgesData) {
+            var cy = cytoscape({
+                container: document.getElementById('cy'), // HTML要素ID
+                elements: { nodes: nodesData, edges: edgesData },
+
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': 'data(color)',
+                            'label': 'data(label)',
+                            'text-wrap': 'wrap',
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'color': '#fff',
+                            'font-size': '12px'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2,
+                            'line-color': '#B2B2B2',
+                            'target-arrow-color': '#B2B2B2',
+                            'target-arrow-shape': 'triangle'
+                        }
+                    }
+                ],
+
+                layout: {
+                    name: 'grid',
+                    rows: 2
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
