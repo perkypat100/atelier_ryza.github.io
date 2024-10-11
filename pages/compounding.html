@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>レシピ一覧</title>
+    <title>ライザのアトリエ 情報置き場 調合</title>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css">
     <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
     <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
@@ -12,23 +12,55 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.21.0/cytoscape.min.js"></script>
     <!-- CytoscapeのCDN -->
     <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
         #cy {
             width: 100%;
-            height: 500px;
+            height: 80%;
             display: block;
-            margin-top: 20px;
+        }
+
+        .popup {
+            display: none;
+            /* 初期は非表示 */
+            position: absolute;
+            background-color: #fff;
+            border: 1px solid #000;
+            padding: 10px;
+            z-index: 10;
+        }
+
+        .square {
+            position: absolute;
+            background-color: #fff;
+            border: 1px solid #000;
+            padding: 10px;
+            z-index: 10;
         }
     </style>
 </head>
 
 <body>
-    <h2>レシピ一覧表</h2>
+    <h1>ライザのアトリエ 情報置き場 調合</h1>
+    このページでは調合の情報を漏れなく記述する。
+
+    <hr>
     <table id="recipeTable" class="display" style="width:100%">
         <thead>
             <tr>
                 <th>レシピ名</th>
                 <th>種類</th>
-                <th>対応グラフ</th>
+                <th>必要調合レベル</th>
+                <th>属性値</th>
+                <th>CC</th>
+                <th>範囲</th>
+                <th>作成個数</th>
+                <th>生成環</th>
             </tr>
             <tr>
                 <th><input type="text" placeholder="Search レシピ名" /></th>
@@ -39,6 +71,11 @@
                         <option value="装備">装備</option>
                     </select>
                 </th>
+                <th><input type="text" placeholder="Search 必要調合レベル" /></th>
+                <th><input type="text" placeholder="Search 属性値" /></th>
+                <th><input type="text" placeholder="Search CC" /></th>
+                <th><input type="text" placeholder="Search 範囲" /></th>
+                <th><input type="text" placeholder="Search 作成個数" /></th>
                 <th></th> <!-- 対応グラフ列には検索窓は不要 -->
             </tr>
         </thead>
@@ -47,15 +84,17 @@
     </table>
 
     <!-- グラフを表示する領域 -->
+    <h2 id="recipeName">以下にグラフを表示します</h2>
     <div id="cy"></div>
+    <div id="popup" class="popup"></div>
 
     <script>
         // Define a color map based on color names
         const colorMap = {
-            "黄": "#B5A60A",
-            "赤": "#D13A30",
-            "青": "#2C5C7A",
-            "緑": "#5A9A47"
+            "雷": "#B5A60A",
+            "火": "#D13A30",
+            "氷": "#2C5C7A",
+            "風": "#5A9A47"
         };
 
         // Function to create Cytoscape graph
@@ -73,6 +112,11 @@
                             '<tr>' +
                             '<td>' + row['レシピ名'] + '</td>' +
                             '<td>' + row['種類'] + '</td>' +
+                            '<td>' + row['必要調合レベル'] + '</td>' +
+                            '<td>' + row['属性値'] + '</td>' +
+                            '<td>' + row['CC'] + '</td>' +
+                            '<td>' + row['範囲'] + '</td>' +
+                            '<td>' + row['作成個数'] + '</td>' +
                             '<td><button class="view-graph" data-recipe-name="' + row['レシピ名'] + '">グラフを見る</button></td>' +
                             '</tr>'
                         );
@@ -81,15 +125,25 @@
                     // DataTablesの初期化
                     var table = $('#recipeTable').DataTable();
 
-                    // レシピ名列の検索機能
-                    table.columns(0).every(function () {
-                        var that = this;
-                        $('input', this.header()).on('keyup change', function () {
-                            if (that.search() !== this.value) {
-                                that.search(this.value).draw();
-                            }
+                    // 共通の検索ロジックを関数化
+                    function enableColumnSearch(columnIndex) {
+                        table.columns(columnIndex).every(function () {
+                            var that = this;
+                            $('input', this.header()).on('keyup change', function () {
+                                if (that.search() !== this.value) {
+                                    that.search(this.value).draw();
+                                }
+                            });
                         });
-                    });
+                    }
+
+                    // 各列の検索機能を有効にする
+                    enableColumnSearch(0);
+                    enableColumnSearch(2);
+                    enableColumnSearch(3);
+                    enableColumnSearch(4);
+                    enableColumnSearch(5);
+                    enableColumnSearch(6);
 
                     // 種類列のドロップダウンフィルタリング
                     $('#typeFilter').on('change', function () {
@@ -109,6 +163,9 @@
 
         // CSVからデータを読み込み、Cytoscapeでグラフを描画する関数
         function loadGraphFromCSV(recipeName) {
+            // Set the recipe name as the title
+            document.getElementById('recipeName').innerText = 'グラフ表示中のレシピ: ' + recipeName + ' (太枠が開始ノード)';
+
             // ノードデータの読み込み
             Papa.parse('compounding_nodes.csv', {
                 download: true,
@@ -122,9 +179,9 @@
                                 id: row.id,
                                 label: row['ラベル'],
                                 color: colorMap[row['色']], // Map color name to color code
-                                priority: row['優先度'], // Use the 優先度 column
+                                frame: row['枠'], // Use the 枠 column
                                 material: row['材料'], // Use the 材料 column
-                                attribute_value: row['属性値'] // Use the 属性値 column
+                                attributeValue: row['属性値'] // Use the 属性値 column
                             }
                         };
                     });
@@ -140,7 +197,8 @@
                                 return {
                                     data: {
                                         source: row.source,
-                                        target: row.target
+                                        target: row.target,
+                                        label: row['ラベル'],
                                     }
                                 };
                             });
@@ -161,45 +219,125 @@
                 elements: { nodes: nodesData, edges: edgesData },
 
                 style: [
-                    // Style for main nodes
+                    // 通常のノードのスタイル
                     {
                         selector: 'node',
                         style: {
                             'background-color': 'data(color)', // Use the color from the CSV data
                             'label': function (ele) {
-                                return '材料: ' + ele.data('material') + '\n属性値: ' + ele.data('attribute_value');
+                                return ele.data('frame') + '\n' + ele.data('material');
                             },
                             'text-wrap': 'wrap',
                             'text-max-width': '80px',
                             'color': '#fff',
                             'text-valign': 'center',
                             'text-halign': 'center',
-                            'font-size': '10px',
+                            'font-size': '20px',
                             'shape': 'ellipse',
                             'width': '80px',
                             'height': '80px'
                         }
                     },
 
-                    // Style for edges
+                    // 開始ノードの追加スタイル
+                    {
+                        selector: 'node[label="開始ノード"]',
+                        style: {
+                            'border-width': 4,              // 枠線を太く
+                        }
+                    },
+
+                    // エッジのスタイル（ラベル表示）
                     {
                         selector: 'edge',
                         style: {
                             'width': 2,
                             'line-color': '#B2B2B2',
                             'target-arrow-color': '#B2B2B2',
-                            'target-arrow-shape': 'triangle'
+                            'target-arrow-shape': 'triangle',
+                            'label': 'data(label)',  // エッジにラベルを表示
+                            'font-size': '25px',
+                            'color': '#000',
+                            'text-background-color': '#fff', // ラベルの背景色
+                            'text-background-opacity': 1,    // ラベル背景の不透明度
+                            'text-border-color': '#000',     // ラベルの境界線の色
+                            'text-border-width': 1,          // ラベルの境界線の太さ
+                            'text-border-opacity': 1,        // ラベル境界線の不透明度
                         }
                     }
                 ],
 
                 layout: {
-                    name: 'grid',
-                    rows: 2
-                }
+                    name: 'breadthfirst',
+                    directed: true, // エッジの向きを考慮
+                    avoidOverlap: true, // ノードの重なりを避ける
+                    spacingFactor: 0.8 // ノード間の距離を調整（1より小さい値で詰める）
+                },
+
+                userZoomingEnabled: false,
+                userPanningEnabled: false
             });
+
+            // ノードの右下に四角形を常に描画し、情報を表示
+            function drawSquaresForNodes() {
+                cy.nodes().forEach(function (node) {
+
+                    // Cytoscapeコンテナの位置を取得
+                    var cyContainer = document.getElementById('cy').getBoundingClientRect();
+
+                    // ノードの描画位置を取得
+                    var position = node.renderedPosition();
+
+                    // スクロール位置を加味してポップアップ位置を調整
+                    var scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+                    var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+                    // 四角形を作成
+                    var squareDiv = document.createElement('div');
+                    squareDiv.className = 'square';
+                    squareDiv.innerHTML = node.data('attributeValue'); // 四角形の中にノードの情報を描画
+                    document.body.appendChild(squareDiv);
+
+                    // 四角形の位置をノードの右下に設定
+                    squareDiv.style.left = (cyContainer.left + position.x + scrollX + 50) + 'px';
+                    squareDiv.style.top = (cyContainer.top + position.y + scrollY + 20) + 'px';
+                });
+            }
+
+            // Cytoscapeの初期描画後に四角形を描画
+            cy.ready(function () {
+                drawSquaresForNodes();
+            });
+
+            // ズームやパン操作が行われた場合に四角形を再描画
+            cy.on('render', function () {
+                document.querySelectorAll('.square').forEach(function (square) {
+                    square.remove(); // 既存の四角形を削除
+                });
+                drawSquaresForNodes(); // 再描画
+            });
+
         }
     </script>
+
+    <div id="footer"></div>
+    <script>
+        fetch('../include/footer.html')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(data => {
+                document.getElementById('footer').innerHTML = data;
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+    </script>
+
+
 </body>
 
 </html>
