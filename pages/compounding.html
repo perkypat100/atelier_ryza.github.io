@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レシピ一覧</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script> <!-- PapaParseのCDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.21.0/cytoscape.min.js"></script>
+    <!-- CytoscapeのCDN -->
+    <style>
+        #cy {
+            width: 100%;
+            height: 500px;
+            display: block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>レシピ一覧表</h2>
+    <table id="recipeTable" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>レシピ名</th>
+                <th>種類</th>
+                <th>対応グラフ</th>
+            </tr>
+            <tr>
+                <th><input type="text" placeholder="Search レシピ名" /></th>
+                <th>
+                    <select id="typeFilter">
+                        <option value="">すべて</option>
+                        <option value="使用">使用</option>
+                        <option value="装備">装備</option>
+                    </select>
+                </th>
+                <th></th> <!-- 対応グラフ列には検索窓は不要 -->
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <!-- グラフを表示する領域 -->
+    <div id="cy"></div>
+
+    <script>
+        // Define a color map based on color names
+        const colorMap = {
+            "黄": "#B5A60A",
+            "赤": "#D13A30",
+            "青": "#2C5C7A",
+            "緑": "#5A9A47"
+        };
+
+        // Function to create Cytoscape graph
+        $(document).ready(function () {
+            // CSVファイルを読み込み
+            Papa.parse('compounding_recipe.csv', {
+                download: true,
+                header: true,
+                complete: function (results) {
+                    var data = results.data;
+
+                    // テーブルにデータを追加
+                    data.forEach(function (row, index) {
+                        $('#recipeTable tbody').append(
+                            '<tr>' +
+                            '<td>' + row['レシピ名'] + '</td>' +
+                            '<td>' + row['種類'] + '</td>' +
+                            '<td><button class="view-graph" data-recipe-name="' + row['レシピ名'] + '">グラフを見る</button></td>' +
+                            '</tr>'
+                        );
+                    });
+
+                    // DataTablesの初期化
+                    var table = $('#recipeTable').DataTable();
+
+                    // レシピ名列の検索機能
+                    table.columns(0).every(function () {
+                        var that = this;
+                        $('input', this.header()).on('keyup change', function () {
+                            if (that.search() !== this.value) {
+                                that.search(this.value).draw();
+                            }
+                        });
+                    });
+
+                    // 種類列のドロップダウンフィルタリング
+                    $('#typeFilter').on('change', function () {
+                        var selectedValue = $(this).val();
+                        table.column(1).search(selectedValue).draw();
+                    });
+
+                    // グラフ表示の設定
+                    $('.view-graph').on('click', function () {
+                        var recipeName = $(this).data('recipe-name');
+                        loadGraphFromCSV(recipeName); // Pass recipeName instead of graphId
+                    });
+
+                }
+            });
+        });
+
+        // CSVからデータを読み込み、Cytoscapeでグラフを描画する関数
+        function loadGraphFromCSV(recipeName) {
+            // ノードデータの読み込み
+            Papa.parse('compounding_nodes.csv', {
+                download: true,
+                header: true,
+                complete: function (nodeResults) {
+                    nodesData = nodeResults.data.filter(function (row) {
+                        return row['レシピ名'] == recipeName; // recipeNameに基づいてフィルタリング
+                    }).map(function (row) {
+                        return {
+                            data: {
+                                id: row.id,
+                                label: row['ラベル'],
+                                color: colorMap[row['色']], // Map color name to color code
+                                priority: row['優先度'], // Use the 優先度 column
+                                material: row['材料'], // Use the 材料 column
+                                attribute_value: row['属性値'] // Use the 属性値 column
+                            }
+                        };
+                    });
+
+                    // エッジデータの読み込み
+                    Papa.parse('compounding_edges.csv', {
+                        download: true,
+                        header: true,
+                        complete: function (edgeResults) {
+                            edgesData = edgeResults.data.filter(function (row) {
+                                return row['レシピ名'] == recipeName; // recipeNameに基づいてフィルタリング
+                            }).map(function (row) {
+                                return {
+                                    data: {
+                                        source: row.source,
+                                        target: row.target
+                                    }
+                                };
+                            });
+
+                            // グラフを描画
+                            drawGraph(nodesData, edgesData);
+                        }
+                    });
+                }
+            });
+        }
+
+
+        // Cytoscapeでグラフを描画する関数
+        function drawGraph(nodesData, edgesData) {
+            var cy = cytoscape({
+                container: document.getElementById('cy'), // HTML要素ID
+                elements: { nodes: nodesData, edges: edgesData },
+
+                style: [
+                    // Style for main nodes
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': 'data(color)', // Use the color from the CSV data
+                            'label': function (ele) {
+                                return '材料: ' + ele.data('material') + '\n属性値: ' + ele.data('attribute_value');
+                            },
+                            'text-wrap': 'wrap',
+                            'text-max-width': '80px',
+                            'color': '#fff',
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'font-size': '10px',
+                            'shape': 'ellipse',
+                            'width': '80px',
+                            'height': '80px'
+                        }
+                    },
+
+                    // Style for edges
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2,
+                            'line-color': '#B2B2B2',
+                            'target-arrow-color': '#B2B2B2',
+                            'target-arrow-shape': 'triangle'
+                        }
+                    }
+                ],
+
+                layout: {
+                    name: 'grid',
+                    rows: 2
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
