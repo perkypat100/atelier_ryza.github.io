@@ -271,7 +271,8 @@
                     name: 'breadthfirst',
                     directed: true, // エッジの向きを考慮
                     avoidOverlap: true, // ノードの重なりを避ける
-                    spacingFactor: 0.8 // ノード間の距離を調整（1より小さい値で詰める）
+                    spacingFactor: 1.5,  // Adjust this value to increase node spacing
+                    minEdgeLength: 100   // Add this to set a minimum edge length if supported by the layout
                 },
 
                 userZoomingEnabled: false,
@@ -299,8 +300,8 @@
                     document.body.appendChild(squareDiv);
 
                     // 四角形の位置をノードの右下に設定
-                    squareDiv.style.left = (cyContainer.left + position.x + scrollX + 50) + 'px';
-                    squareDiv.style.top = (cyContainer.top + position.y + scrollY + 20) + 'px';
+                    squareDiv.style.left = (cyContainer.left + position.x + scrollX + 30) + 'px';
+                    squareDiv.style.top = (cyContainer.top + position.y + scrollY + 10) + 'px';
                 });
             }
 
